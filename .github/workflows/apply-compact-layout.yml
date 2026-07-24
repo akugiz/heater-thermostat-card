@@ -1,0 +1,164 @@
+name: Apply compact thermostat layout
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-compact-layout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-card:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply compact header layout
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          card_path = Path("custom_components/heater_thermostat/frontend/heater-thermostat-card.js")
+          text = card_path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              "/* Heater Thermostat Card v0.2.3 */",
+              "/* Heater Thermostat Card v0.2.5 */",
+              1,
+          )
+
+          text = text.replace(
+              """        ha-card {
+          overflow: hidden;
+          color: var(--primary-text-color);
+        }
+""",
+              """        ha-card {
+          position: relative;
+          overflow: hidden;
+          color: var(--primary-text-color);
+        }
+""",
+              1,
+          )
+
+          text = text.replace(
+              """        .header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 11px 16px;
+          border-bottom: 1px solid var(--divider-color);
+        }
+
+""",
+              "",
+              1,
+          )
+
+          text = text.replace(
+              """        .power {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
+""",
+              """        .power {
+          position: absolute;
+          top: 12px;
+          left: 12px;
+          z-index: 2;
+          width: 42px;
+          height: 42px;
+""",
+              1,
+          )
+
+          text = text.replace(
+              """        .current-block {
+          padding: 8px 12px 0;
+          text-align: center;
+        }
+
+        .current-label {
+          color: var(--secondary-text-color);
+          font-size: 14px;
+        }
+""",
+              """        .current-block {
+          min-height: 70px;
+          padding: 13px 58px 0;
+          text-align: center;
+        }
+
+        .current-label {
+          overflow: hidden;
+          color: var(--primary-text-color);
+          font-size: 17px;
+          font-weight: 700;
+          line-height: 1.2;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+""",
+              1,
+          )
+
+          old_markup = """        <div class=\"header\">
+          <button id=\"power\" class=\"power\" title=\"Toggle automatic thermostat control\">
+            <ha-icon icon=\"mdi:power\"></ha-icon>
+          </button>
+          <div class=\"name\">
+            <div class=\"title\">${this._escape(model.title)}</div>
+            <div class=\"subtitle\">${this._escape(model.status)}</div>
+          </div>
+          <div class=\"state\">${model.enabled ? \"ON\" : \"OFF\"}</div>
+        </div>
+
+        <div class=\"current-block\">
+          <div class=\"current-label\">Current temperature</div>
+"""
+          new_markup = """        <button
+          id=\"power\"
+          class=\"power\"
+          title=\"Turn automatic thermostat control ${model.enabled ? \"off\" : \"on\"}\"
+          aria-label=\"Turn automatic thermostat control ${model.enabled ? \"off\" : \"on\"}\"
+        >
+          <ha-icon icon=\"mdi:power\"></ha-icon>
+        </button>
+
+        <div class=\"current-block\">
+          <div class=\"current-label\">${this._escape(model.title)}</div>
+"""
+          if old_markup not in text:
+              raise SystemExit("Expected header markup was not found; no changes were committed.")
+          text = text.replace(old_markup, new_markup, 1)
+          card_path.write_text(text, encoding="utf-8")
+
+          const_path = Path("custom_components/heater_thermostat/const.py")
+          const_text = const_path.read_text(encoding="utf-8")
+          const_text = const_text.replace('CARD_VERSION = "0.2.3"', 'CARD_VERSION = "0.2.5"', 1)
+          const_path.write_text(const_text, encoding="utf-8")
+
+          manifest_path = Path("custom_components/heater_thermostat/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          manifest["version"] = "0.2.5"
+          ordered = {
+              "domain": manifest["domain"],
+              "name": manifest["name"],
+              **{key: manifest[key] for key in sorted(manifest) if key not in {"domain", "name"}},
+          }
+          manifest_path.write_text(json.dumps(ordered, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Commit compact layout
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/heater_thermostat/frontend/heater-thermostat-card.js \
+                  custom_components/heater_thermostat/const.py \
+                  custom_components/heater_thermostat/manifest.json
+          git commit -m "Compact thermostat card header"
+          git push
