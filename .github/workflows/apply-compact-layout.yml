@@ -1,3 +1,4 @@
+# Second commit triggers this workflow after it exists on the default branch.
 name: Apply compact thermostat layout
 
 on:
