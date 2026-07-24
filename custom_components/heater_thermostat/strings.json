@@ -24,10 +24,39 @@
       "invalid_range": "The maximum temperature must be higher than the minimum temperature.",
       "on_out_of_range": "The ON temperature must be inside the selectable range.",
       "off_out_of_range": "The OFF temperature must be inside the selectable range.",
-      "gap_too_small": "The OFF temperature must be above the ON temperature by at least the minimum gap."
+      "gap_too_small": "The OFF temperature must be above the ON temperature by at least the minimum gap.",
+      "heater_in_use": "This heater switch is already controlled by another Heater Thermostat."
     },
     "abort": {
       "already_configured": "This heater switch is already controlled by a Heater Thermostat."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit heater thermostat",
+        "description": "Change any thermostat setting. Saving reloads the thermostat controller automatically.",
+        "data": {
+          "name": "Name",
+          "temperature_entity": "Temperature sensor",
+          "heater_entity": "Heater switch",
+          "on_temperature": "Turn heater ON at or below",
+          "off_temperature": "Turn heater OFF at or above",
+          "min_temperature": "Minimum selectable temperature",
+          "max_temperature": "Maximum selectable temperature",
+          "step": "Temperature step",
+          "min_gap": "Minimum gap between ON and OFF",
+          "min_cycle_seconds": "Minimum heater cycle time",
+          "fail_safe": "Turn heater off if the temperature sensor is unavailable"
+        }
+      }
+    },
+    "error": {
+      "invalid_range": "The maximum temperature must be higher than the minimum temperature.",
+      "on_out_of_range": "The ON temperature must be inside the selectable range.",
+      "off_out_of_range": "The OFF temperature must be inside the selectable range.",
+      "gap_too_small": "The OFF temperature must be above the ON temperature by at least the minimum gap.",
+      "heater_in_use": "This heater switch is already controlled by another Heater Thermostat."
     }
   }
 }
