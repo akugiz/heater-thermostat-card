@@ -28,6 +28,6 @@ DEFAULT_MIN_GAP = 1.0
 DEFAULT_MIN_CYCLE = 300
 DEFAULT_FAIL_SAFE = True
 
-CARD_VERSION = "0.2.1"
+CARD_VERSION = "0.2.2"
 CARD_URL_PATH = "/heater_thermostat/heater-thermostat-card.js"
 CARD_RESOURCE_URL = f"{CARD_URL_PATH}?v={CARD_VERSION}"
