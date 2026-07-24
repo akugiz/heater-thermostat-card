@@ -53,25 +53,29 @@ class HeaterThermostatController:
         """Initialize the controller."""
         self.hass = hass
         self.entry = entry
-        self.temperature_entity_id: str = entry.data[CONF_TEMPERATURE_ENTITY]
-        self.heater_entity_id: str = entry.data[CONF_HEATER_ENTITY]
+        settings = {**entry.data, **entry.options}
+
+        self.temperature_entity_id: str = settings[CONF_TEMPERATURE_ENTITY]
+        self.heater_entity_id: str = settings[CONF_HEATER_ENTITY]
 
         self.min_temperature = float(
-            entry.data.get(CONF_MIN_TEMPERATURE, DEFAULT_MIN_TEMPERATURE)
+            settings.get(CONF_MIN_TEMPERATURE, DEFAULT_MIN_TEMPERATURE)
         )
         self.max_temperature = float(
-            entry.data.get(CONF_MAX_TEMPERATURE, DEFAULT_MAX_TEMPERATURE)
+            settings.get(CONF_MAX_TEMPERATURE, DEFAULT_MAX_TEMPERATURE)
         )
-        self.step = float(entry.data.get(CONF_STEP, DEFAULT_STEP))
-        self.min_gap = float(entry.data.get(CONF_MIN_GAP, DEFAULT_MIN_GAP))
-        self.min_cycle_seconds = int(entry.data.get(CONF_MIN_CYCLE, DEFAULT_MIN_CYCLE))
-        self.fail_safe = bool(entry.data.get(CONF_FAIL_SAFE, DEFAULT_FAIL_SAFE))
+        self.step = float(settings.get(CONF_STEP, DEFAULT_STEP))
+        self.min_gap = float(settings.get(CONF_MIN_GAP, DEFAULT_MIN_GAP))
+        self.min_cycle_seconds = int(
+            settings.get(CONF_MIN_CYCLE, DEFAULT_MIN_CYCLE)
+        )
+        self.fail_safe = bool(settings.get(CONF_FAIL_SAFE, DEFAULT_FAIL_SAFE))
 
         self.on_temperature = float(
-            entry.data.get(CONF_ON_TEMPERATURE, DEFAULT_ON_TEMPERATURE)
+            settings.get(CONF_ON_TEMPERATURE, DEFAULT_ON_TEMPERATURE)
         )
         self.off_temperature = float(
-            entry.data.get(CONF_OFF_TEMPERATURE, DEFAULT_OFF_TEMPERATURE)
+            settings.get(CONF_OFF_TEMPERATURE, DEFAULT_OFF_TEMPERATURE)
         )
         self.enabled = False
         self.status = "disabled"
@@ -260,43 +264,41 @@ class HeaterThermostatController:
         return max(0.0, self.min_cycle_seconds - elapsed)
 
     def _schedule_after_cycle_delay(self) -> None:
-        """Schedule a reevaluation when the minimum cycle duration expires."""
-        delay = self._remaining_cycle_delay() + 0.2
+        """Schedule another evaluation when the minimum cycle delay expires."""
+        remaining = self._remaining_cycle_delay()
+        if remaining <= 0:
+            self.hass.async_create_task(self.async_evaluate())
+            return
 
-        async def delayed_evaluation(_now: datetime) -> None:
+        @callback
+        def evaluate_again(_: datetime) -> None:
             self._cancel_delayed_evaluation = None
-            await self.async_evaluate()
+            self.hass.async_create_task(self.async_evaluate())
 
         self._cancel_delayed_evaluation = async_call_later(
             self.hass,
-            delay,
-            delayed_evaluation,
+            remaining,
+            evaluate_again,
         )
 
     @callback
     def _cancel_delayed(self) -> None:
+        """Cancel a pending delayed evaluation."""
         if self._cancel_delayed_evaluation is not None:
             self._cancel_delayed_evaluation()
             self._cancel_delayed_evaluation = None
 
     def _round_to_step(self, value: float) -> float:
-        """Round a value to the nearest configured temperature step."""
-        if self.step <= 0:
-            return float(value)
-        rounded = round((float(value) - self.min_temperature) / self.step)
-        return round(self.min_temperature + rounded * self.step, 4)
+        return round(
+            self.min_temperature
+            + round((value - self.min_temperature) / self.step) * self.step,
+            6,
+        )
 
     def _floor_to_step(self, value: float) -> float:
-        """Round a value down to the configured step."""
-        if self.step <= 0:
-            return float(value)
-        steps = int((float(value) - self.min_temperature) // self.step)
-        return round(self.min_temperature + steps * self.step, 4)
+        steps = int((value - self.min_temperature) // self.step)
+        return round(self.min_temperature + steps * self.step, 6)
 
     def _ceil_to_step(self, value: float) -> float:
-        """Round a value up to the configured step."""
-        if self.step <= 0:
-            return float(value)
-        relative = (float(value) - self.min_temperature) / self.step
-        steps = int(relative) if relative == int(relative) else int(relative) + 1
-        return round(self.min_temperature + steps * self.step, 4)
+        steps = -int(-((value - self.min_temperature) / self.step) // 1)
+        return round(self.min_temperature + steps * self.step, 6)
