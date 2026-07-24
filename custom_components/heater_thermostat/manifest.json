@@ -1,12 +1,12 @@
 {
   "domain": "heater_thermostat",
   "name": "Heater Thermostat",
-  "version": "0.2.3",
-  "config_flow": true,
-  "documentation": "https://github.com/akugiz/heater-thermostat-card",
-  "issue_tracker": "https://github.com/akugiz/heater-thermostat-card/issues",
   "codeowners": ["@akugiz"],
+  "config_flow": true,
   "dependencies": ["frontend", "http", "lovelace", "number", "switch"],
+  "documentation": "https://github.com/akugiz/heater-thermostat-card",
+  "integration_type": "service",
   "iot_class": "local_push",
-  "integration_type": "service"
+  "issue_tracker": "https://github.com/akugiz/heater-thermostat-card/issues",
+  "version": "0.2.4"
 }
