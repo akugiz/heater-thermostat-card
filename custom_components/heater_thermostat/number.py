@@ -11,7 +11,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .const import (
+    CONF_OFF_TEMPERATURE,
+    CONF_ON_TEMPERATURE,
+    DOMAIN,
+)
 from .controller import HeaterThermostatController
 from .entity import HeaterThermostatEntityMixin
 
@@ -59,6 +63,15 @@ class HeaterThermostatThresholdNumber(HeaterThermostatEntityMixin, RestoreNumber
         self._attr_native_unit_of_measurement = controller.temperature_unit
 
     @property
+    def _option_key(self) -> str:
+        """Return the config-entry option used by this number."""
+        return (
+            CONF_ON_TEMPERATURE
+            if self.threshold == "on"
+            else CONF_OFF_TEMPERATURE
+        )
+
+    @property
     def native_value(self) -> float:
         """Return the current threshold."""
         if self.threshold == "on":
@@ -66,26 +79,38 @@ class HeaterThermostatThresholdNumber(HeaterThermostatEntityMixin, RestoreNumber
         return self.controller.off_temperature
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the threshold."""
+        """Set and persist the threshold."""
         if self.threshold == "on":
             await self.controller.async_set_on_temperature(value)
         else:
             await self.controller.async_set_off_temperature(value)
 
+        options = {
+            **self.entry.options,
+            self._option_key: self.native_value,
+        }
+        self.hass.config_entries.async_update_entry(
+            self.entry,
+            options=options,
+        )
+
     async def async_added_to_hass(self) -> None:
-        """Restore the previous threshold and publish the entity id."""
+        """Restore old values when no config-entry option exists yet."""
         await super().async_added_to_hass()
-        restored = await self.async_get_last_number_data()
-        restored_value = restored.native_value if restored is not None else None
+
+        if self._option_key not in self.entry.options:
+            restored = await self.async_get_last_number_data()
+            restored_value = restored.native_value if restored is not None else None
+            if restored_value is not None:
+                if self.threshold == "on":
+                    await self.controller.async_set_on_temperature(restored_value)
+                else:
+                    await self.controller.async_set_off_temperature(restored_value)
 
         if self.threshold == "on":
             self.controller.on_temperature_entity_id = self.entity_id
-            if restored_value is not None:
-                await self.controller.async_set_on_temperature(restored_value)
         else:
             self.controller.off_temperature_entity_id = self.entity_id
-            if restored_value is not None:
-                await self.controller.async_set_off_temperature(restored_value)
 
         await self.controller.async_evaluate()
         self.async_write_ha_state()
