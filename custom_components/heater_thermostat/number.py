@@ -87,4 +87,5 @@ class HeaterThermostatThresholdNumber(HeaterThermostatEntityMixin, RestoreNumber
             if restored_value is not None:
                 await self.controller.async_set_off_temperature(restored_value)
 
+        await self.controller.async_evaluate()
         self.async_write_ha_state()
