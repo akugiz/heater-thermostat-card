@@ -1,4 +1,4 @@
-/* Heater Thermostat Card v0.1.1 */
+/* Heater Thermostat Card v0.2.1 */
 class HeaterThermostatCard extends HTMLElement {
   constructor() {
     super();
@@ -12,6 +12,7 @@ class HeaterThermostatCard extends HTMLElement {
     this._config = {
       show_threshold_boxes: true,
       show_cycle_info: true,
+      show_step_buttons: true,
       ...config,
     };
     this.render();
@@ -23,7 +24,7 @@ class HeaterThermostatCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._config.show_threshold_boxes === false ? 5 : 7;
+    return this._config.show_threshold_boxes === false ? 5 : 6;
   }
 
   getGridOptions() {
@@ -35,6 +36,7 @@ class HeaterThermostatCard extends HTMLElement {
       entity: "",
       show_threshold_boxes: true,
       show_cycle_info: true,
+      show_step_buttons: true,
     };
   }
 
@@ -52,6 +54,7 @@ class HeaterThermostatCard extends HTMLElement {
         },
         { name: "title", selector: { text: {} } },
         { name: "show_threshold_boxes", selector: { boolean: {} } },
+        { name: "show_step_buttons", selector: { boolean: {} } },
         { name: "show_cycle_info", selector: { boolean: {} } },
       ],
       computeLabel: (schema) =>
@@ -59,6 +62,7 @@ class HeaterThermostatCard extends HTMLElement {
           entity: "Heater thermostat",
           title: "Card title",
           show_threshold_boxes: "Show ON/OFF boxes",
+          show_step_buttons: "Show − / + buttons",
           show_cycle_info: "Show gap and cycle time",
         })[schema.name],
     };
@@ -75,8 +79,7 @@ class HeaterThermostatCard extends HTMLElement {
 
   _format(value, step = 0.5) {
     if (!Number.isFinite(value)) return "--";
-    const decimals =
-      step < 1 ? String(step).split(".")[1]?.length || 1 : 0;
+    const decimals = step < 1 ? String(step).split(".")[1]?.length || 1 : 0;
     return Number(value).toFixed(decimals);
   }
 
@@ -115,8 +118,7 @@ class HeaterThermostatCard extends HTMLElement {
         attributes.current_temperature,
         null,
       ),
-      heaterOn:
-        heater?.state === "on" || attributes.heater_state === "on",
+      heaterOn: heater?.state === "on" || attributes.heater_state === "on",
       on: this._drag
         ? this._drag.on
         : this._number(onEntity?.state, attributes.on_temperature, 17),
@@ -142,11 +144,11 @@ class HeaterThermostatCard extends HTMLElement {
   }
 
   _point(angle) {
-    const radius = 105;
+    const radius = 110;
     const radians = (angle * Math.PI) / 180;
     return {
       x: 180 + radius * Math.cos(radians),
-      y: 245 + radius * Math.sin(radians),
+      y: 172 + radius * Math.sin(radians),
     };
   }
 
@@ -161,7 +163,7 @@ class HeaterThermostatCard extends HTMLElement {
   _path(startAngle, endAngle) {
     const start = this._point(startAngle);
     const end = this._point(endAngle);
-    return `M ${start.x} ${start.y} A 105 105 0 0 1 ${end.x} ${end.y}`;
+    return `M ${start.x} ${start.y} A 110 110 0 0 1 ${end.x} ${end.y}`;
   }
 
   _cycle(seconds) {
@@ -169,6 +171,15 @@ class HeaterThermostatCard extends HTMLElement {
     if (seconds < 60) return `${Math.round(seconds)} sec`;
     const minutes = seconds / 60;
     return `${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} min`;
+  }
+
+  _round(value, model) {
+    return Number(
+      (
+        model.min +
+        Math.round((value - model.min) / model.step) * model.step
+      ).toFixed(4),
+    );
   }
 
   _message(text) {
@@ -179,6 +190,58 @@ class HeaterThermostatCard extends HTMLElement {
           ${this._escape(text)}
         </div>
       </ha-card>`;
+  }
+
+  _stepButtons(type, model) {
+    if (this._config.show_step_buttons === false) return "";
+
+    const epsilon = 0.0001;
+    const downDisabled =
+      type === "on"
+        ? model.on <= model.min + epsilon
+        : model.off - model.step < model.on + model.gap - epsilon;
+    const upDisabled =
+      type === "on"
+        ? model.on + model.step > model.off - model.gap + epsilon
+        : model.off >= model.max - epsilon;
+
+    return `
+      <button
+        class="step-button ${type}"
+        data-threshold="${type}"
+        data-direction="-1"
+        title="Decrease ${type.toUpperCase()} temperature"
+        aria-label="Decrease ${type.toUpperCase()} temperature"
+        ${downDisabled ? "disabled" : ""}
+      >−</button>
+      <div id="${type}box" class="box-value">${this._format(model[type], model.step)}${this._escape(model.unit)}</div>
+      <button
+        class="step-button ${type}"
+        data-threshold="${type}"
+        data-direction="1"
+        title="Increase ${type.toUpperCase()} temperature"
+        aria-label="Increase ${type.toUpperCase()} temperature"
+        ${upDisabled ? "disabled" : ""}
+      >+</button>`;
+  }
+
+  _thresholdControl(type, model) {
+    const title = type === "on" ? "Heater ON" : "Heater OFF";
+    const hint = type === "on" ? "Drag blue handle" : "Drag red handle";
+    const classes = this._config.show_threshold_boxes === false
+      ? `threshold-control ${type} compact`
+      : `threshold-control ${type}`;
+
+    const controls = this._config.show_step_buttons === false
+      ? `<div id="${type}box" class="box-value solo">${this._format(model[type], model.step)}${this._escape(model.unit)}</div>`
+      : this._stepButtons(type, model);
+
+    return `
+      <div class="${classes}">
+        <div class="control-title">${title}</div>
+        <div class="stepper">${controls}</div>
+        <div class="hint">${hint}</div>
+      </div>`;
   }
 
   render() {
@@ -227,7 +290,7 @@ class HeaterThermostatCard extends HTMLElement {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 14px 16px;
+          padding: 12px 16px;
           border-bottom: 1px solid var(--divider-color);
         }
 
@@ -284,8 +347,43 @@ class HeaterThermostatCard extends HTMLElement {
           };
         }
 
+        .current-block {
+          padding: 12px 12px 0;
+          text-align: center;
+        }
+
+        .current-label {
+          color: var(--secondary-text-color);
+          font-size: 14px;
+        }
+
+        .current-value {
+          margin-top: 2px;
+          color: var(--primary-text-color);
+          font-size: 48px;
+          font-weight: 500;
+          line-height: 1.05;
+        }
+
+        .current-unit {
+          margin-left: 3px;
+          font-size: 21px;
+        }
+
+        .heater-state {
+          margin-top: 4px;
+          color: ${
+            model.heaterOn
+              ? "var(--heater-red)"
+              : "var(--secondary-text-color)"
+          };
+          font-size: 14px;
+          font-weight: 500;
+        }
+
         .arc-wrap {
-          padding: 4px 8px 0;
+          margin-top: 2px;
+          padding: 0 8px;
         }
 
         svg {
@@ -337,99 +435,111 @@ class HeaterThermostatCard extends HTMLElement {
           fill: var(--heater-red);
         }
 
-        .current-label {
-          fill: var(--secondary-text-color);
-          font-size: 12px;
-          text-anchor: middle;
-        }
-
-        .current-value {
-          fill: var(--primary-text-color);
-          font-size: 41px;
-          font-weight: 500;
-          text-anchor: middle;
-        }
-
-        .heater-state {
-          fill: ${
-            model.heaterOn
-              ? "var(--heater-red)"
-              : "var(--secondary-text-color)"
-          };
-          font-size: 13px;
-          text-anchor: middle;
-        }
-
-        .threshold-label {
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .threshold-value {
-          fill: var(--primary-text-color);
-          font-size: 18px;
-        }
-
-        .align-left {
-          text-anchor: start;
-        }
-
-        .align-right {
-          text-anchor: end;
-        }
-
-        .on-text {
-          fill: var(--heater-blue);
-        }
-
-        .off-text {
-          fill: var(--heater-red);
-        }
-
-        .boxes {
+        .thresholds {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 10px;
           padding: 0 12px 12px;
         }
 
-        .box {
-          border: 1px solid var(--divider-color);
-          background: var(--secondary-background-color);
-          border-radius: 12px;
-          padding: 13px;
+        .threshold-control {
           min-width: 0;
+          padding: 12px;
+          border: 1px solid var(--divider-color);
+          border-radius: 12px;
+          background: var(--secondary-background-color);
         }
 
-        .box.on {
+        .threshold-control.on {
           box-shadow: inset 3px 0 0 var(--heater-blue);
         }
 
-        .box.off {
+        .threshold-control.off {
           box-shadow: inset 3px 0 0 var(--heater-red);
         }
 
-        .box h4 {
-          margin: 0;
+        .threshold-control.compact {
+          padding: 6px 4px 10px;
+          border: 0;
+          background: transparent;
+          box-shadow: none;
+        }
+
+        .control-title {
           color: var(--secondary-text-color);
           font-size: 14px;
+          font-weight: 700;
+        }
+
+        .threshold-control.on .control-title {
+          color: var(--heater-blue);
+        }
+
+        .threshold-control.off .control-title {
+          color: var(--heater-red);
+        }
+
+        .stepper {
+          display: grid;
+          grid-template-columns: 38px minmax(54px, 1fr) 38px;
+          align-items: center;
+          gap: 6px;
+          margin-top: 8px;
         }
 
         .box-value {
-          margin-top: 8px;
-          font-size: 27px;
+          min-width: 0;
           color: var(--primary-text-color);
+          font-size: 24px;
+          line-height: 38px;
+          text-align: center;
+          white-space: nowrap;
+        }
+
+        .box-value.solo {
+          grid-column: 1 / -1;
+        }
+
+        .step-button {
+          width: 38px;
+          height: 38px;
+          border: 1px solid var(--divider-color);
+          border-radius: 50%;
+          color: var(--primary-text-color);
+          background: var(--card-background-color, var(--ha-card-background));
+          font-size: 25px;
+          line-height: 1;
+          cursor: pointer;
+          transition: transform 0.08s ease, opacity 0.15s ease;
+        }
+
+        .step-button.on {
+          border-color: color-mix(in srgb, var(--heater-blue) 55%, var(--divider-color));
+        }
+
+        .step-button.off {
+          border-color: color-mix(in srgb, var(--heater-red) 55%, var(--divider-color));
+        }
+
+        .step-button:active:not(:disabled) {
+          transform: scale(0.92);
+        }
+
+        .step-button:disabled {
+          cursor: default;
+          opacity: 0.32;
         }
 
         .hint {
-          margin-top: 3px;
-          font-size: 11px;
+          margin-top: 4px;
           color: var(--secondary-text-color);
+          font-size: 11px;
+          text-align: center;
         }
 
         .footer {
           margin: 0 12px 12px;
-          padding: 10px;
+          padding: 9px 10px;
           border: 1px solid var(--divider-color);
           border-radius: 10px;
           color: var(--secondary-text-color);
@@ -437,18 +547,42 @@ class HeaterThermostatCard extends HTMLElement {
           text-align: center;
         }
 
-        @media (max-width: 520px) {
+        @media (max-width: 420px) {
           .header {
-            padding: 12px 14px;
+            padding: 10px 12px;
           }
 
-          .boxes {
-            grid-template-columns: 1fr 1fr;
+          .current-block {
+            padding-top: 10px;
+          }
+
+          .current-value {
+            font-size: 44px;
+          }
+
+          .thresholds {
             gap: 8px;
+            padding: 0 8px 10px;
+          }
+
+          .threshold-control {
+            padding: 10px 7px;
+          }
+
+          .stepper {
+            grid-template-columns: 34px minmax(46px, 1fr) 34px;
+            gap: 3px;
+          }
+
+          .step-button {
+            width: 34px;
+            height: 34px;
+            font-size: 22px;
           }
 
           .box-value {
-            font-size: 23px;
+            font-size: 21px;
+            line-height: 34px;
           }
         }
       </style>
@@ -465,44 +599,26 @@ class HeaterThermostatCard extends HTMLElement {
           <div class="state">${model.enabled ? "ON" : "OFF"}</div>
         </div>
 
+        <div class="current-block">
+          <div class="current-label">Current temperature</div>
+          <div class="current-value">${current}<span class="current-unit">${this._escape(model.unit)}</span></div>
+          <div class="heater-state">Heater: ${model.heaterOn ? "ON" : "OFF"}</div>
+        </div>
+
         <div class="arc-wrap">
-          <svg id="arc" viewBox="0 0 360 310" role="img" aria-label="Heater temperature thresholds">
+          <svg id="arc" viewBox="0 0 360 188" role="img" aria-label="Heater temperature thresholds">
             <path class="arc-base" d="${this._path(180, 360)}"></path>
             <path id="blue" class="arc-blue" d="${this._path(180, onAngle)}"></path>
             <path id="red" class="arc-red" d="${this._path(offAngle, 360)}"></path>
-
-            <text class="current-label" x="180" y="74">Current temperature</text>
-            <text class="current-value" x="180" y="118">
-              ${current}<tspan font-size="18" dx="3">${this._escape(model.unit)}</tspan>
-            </text>
-            <text class="heater-state" x="180" y="142">Heater: ${model.heaterOn ? "ON" : "OFF"}</text>
-
-            <circle id="on" class="handle on" cx="${onPoint.x}" cy="${onPoint.y}" r="12"></circle>
-            <circle id="off" class="handle off" cx="${offPoint.x}" cy="${offPoint.y}" r="12"></circle>
-
-            <text class="threshold-label align-left on-text" x="68" y="282">ON at</text>
-            <text id="onv" class="threshold-value align-left" x="68" y="306">${this._format(model.on, model.step)}${this._escape(model.unit)}</text>
-            <text class="threshold-label align-right off-text" x="292" y="282">OFF at</text>
-            <text id="offv" class="threshold-value align-right" x="292" y="306">${this._format(model.off, model.step)}${this._escape(model.unit)}</text>
+            <circle id="on" class="handle on" cx="${onPoint.x}" cy="${onPoint.y}" r="13"></circle>
+            <circle id="off" class="handle off" cx="${offPoint.x}" cy="${offPoint.y}" r="13"></circle>
           </svg>
         </div>
 
-        ${
-          this._config.show_threshold_boxes === false
-            ? ""
-            : `<div class="boxes">
-                <div class="box on">
-                  <h4>Heater ON</h4>
-                  <div id="onbox" class="box-value">${this._format(model.on, model.step)}${this._escape(model.unit)}</div>
-                  <div class="hint">Drag blue handle</div>
-                </div>
-                <div class="box off">
-                  <h4>Heater OFF</h4>
-                  <div id="offbox" class="box-value">${this._format(model.off, model.step)}${this._escape(model.unit)}</div>
-                  <div class="hint">Drag red handle</div>
-                </div>
-              </div>`
-        }
+        <div class="thresholds">
+          ${this._thresholdControl("on", model)}
+          ${this._thresholdControl("off", model)}
+        </div>
 
         ${
           this._config.show_cycle_info === false
@@ -519,10 +635,46 @@ class HeaterThermostatCard extends HTMLElement {
       );
     });
 
-    this._bind();
+    this.shadowRoot.querySelectorAll(".step-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        const type = button.dataset.threshold;
+        const direction = Number(button.dataset.direction);
+        this._adjustThreshold(type, direction);
+      });
+    });
+
+    this._bindDrag();
   }
 
-  _bind() {
+  async _adjustThreshold(type, direction) {
+    const model = this._model();
+    if (!model || !["on", "off"].includes(type) || ![-1, 1].includes(direction)) {
+      return;
+    }
+
+    let value;
+    if (type === "on") {
+      const maximum = this._round(model.off - model.gap, model);
+      value = Math.max(
+        model.min,
+        Math.min(maximum, this._round(model.on + direction * model.step, model)),
+      );
+    } else {
+      const minimum = this._round(model.on + model.gap, model);
+      value = Math.min(
+        model.max,
+        Math.max(minimum, this._round(model.off + direction * model.step, model)),
+      );
+    }
+
+    const entityId = type === "on" ? model.onId : model.offId;
+    await this._hass.callService("number", "set_value", {
+      entity_id: entityId,
+      value,
+    });
+  }
+
+  _bindDrag() {
     const svg = this.shadowRoot.querySelector("#arc");
     if (!svg) return;
 
@@ -555,15 +707,6 @@ class HeaterThermostatCard extends HTMLElement {
     this._move(event);
   }
 
-  _round(value, model) {
-    return Number(
-      (
-        model.min +
-        Math.round((value - model.min) / model.step) * model.step
-      ).toFixed(4),
-    );
-  }
-
   _move(event) {
     if (!this._drag || event.pointerId !== this._drag.pointer) return;
 
@@ -574,14 +717,14 @@ class HeaterThermostatCard extends HTMLElement {
 
     const rect = svg.getBoundingClientRect();
     const x = ((event.clientX - rect.left) * 360) / rect.width;
-    const y = ((event.clientY - rect.top) * 310) / rect.height;
+    const y = ((event.clientY - rect.top) * 188) / rect.height;
 
-    let angle = (Math.atan2(y - 245, x - 180) * 180) / Math.PI;
+    let angle = (Math.atan2(y - 172, x - 180) * 180) / Math.PI;
     if (angle < 0) angle += 360;
     if (angle < 180) angle = x < 180 ? 180 : 360;
     angle = Math.max(180, Math.min(360, angle));
 
-    let value = this._round(
+    const value = this._round(
       model.min + ((angle - 180) / 180) * (model.max - model.min),
       model,
     );
@@ -630,9 +773,7 @@ class HeaterThermostatCard extends HTMLElement {
     }
 
     for (const [id, value] of [
-      ["onv", drag.on],
       ["onbox", drag.on],
-      ["offv", drag.off],
       ["offbox", drag.off],
     ]) {
       const element = this.shadowRoot.querySelector(`#${id}`);
@@ -646,8 +787,7 @@ class HeaterThermostatCard extends HTMLElement {
     if (!this._drag || event.pointerId !== this._drag.pointer) return;
 
     const drag = this._drag;
-    const entityId =
-      drag.type === "on" ? drag.model.onId : drag.model.offId;
+    const entityId = drag.type === "on" ? drag.model.onId : drag.model.offId;
     const value = drag.type === "on" ? drag.on : drag.off;
     this._drag = null;
 
