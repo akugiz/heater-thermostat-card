@@ -16,6 +16,7 @@ The integration runs in Home Assistant continuously. The dashboard does **not** 
 - Minimum cycle duration helps prevent rapid heater switching.
 - Fail-safe can turn the heater off if the temperature sensor becomes unavailable.
 - Threshold values and enabled state survive Home Assistant restarts.
+- All thermostat settings can be edited later from the integration **Configure** screen.
 - Visual dashboard card editor.
 - HACS installation with automatic dashboard-resource registration.
 
@@ -41,6 +42,26 @@ Thermostat disabled   -> Heater forced OFF
 7. Open **Settings → Devices & services → Add integration**.
 8. Search for **Heater Thermostat**.
 9. Select the temperature sensor and physical heater switch.
+
+## Edit settings after installation
+
+Open:
+
+**Settings → Devices & services → Heater Thermostat → Configure**
+
+You can change:
+
+- Thermostat name
+- Temperature sensor
+- Physical heater switch
+- Heater ON and OFF temperatures
+- Minimum and maximum selectable temperatures
+- Temperature step
+- Minimum gap
+- Minimum cycle time
+- Sensor-unavailable fail-safe
+
+Saving the form reloads the thermostat controller automatically. The ON/OFF temperatures can also still be changed from the card or the two number entities.
 
 ## Add the dashboard card
 
@@ -80,6 +101,6 @@ Automatic card registration works with normal Lovelace storage mode. YAML-mode u
 
 ```yaml
 resources:
-  - url: /heater_thermostat/heater-thermostat-card.js?v=0.1.1
+  - url: /heater_thermostat/heater-thermostat-card.js?v=0.2.0
     type: module
 ```
