@@ -80,6 +80,6 @@ Automatic card registration works with normal Lovelace storage mode. YAML-mode u
 
 ```yaml
 resources:
-  - url: /heater_thermostat/heater-thermostat-card.js?v=0.1.0
+  - url: /heater_thermostat/heater-thermostat-card.js?v=0.1.1
     type: module
 ```
