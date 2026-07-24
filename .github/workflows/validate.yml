@@ -5,13 +5,16 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
 
 jobs:
   hacs:
     name: HACS
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: HACS validation
         uses: hacs/action@main
         with:
@@ -21,5 +24,7 @@ jobs:
     name: Hassfest
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: Hassfest validation
         uses: home-assistant/actions/hassfest@master
