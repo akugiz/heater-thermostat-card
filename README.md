@@ -4,7 +4,7 @@ A complete thermostat controller and draggable dual-handle arc card for electric
 
 The integration runs in Home Assistant continuously. The dashboard does **not** need to remain open, and separate heater ON/OFF automations are not required.
 
-![Heater Thermostat Card preview](preview.svg)
+![Heater Thermostat Card preview](preview.png)
 
 ## Features
 
